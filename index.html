@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pomodoro Timer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* CSS untuk Tema Gemes (Cute Theme) */
+        :root {
+            --bg-focus: #FFF0F5; /* Lavender Blush */
+            --bg-short-break: #E0FFFF; /* Light Cyan */
+            --bg-long-break: #F0FFF0; /* Honeydew */
+            --primary-color: #4B0082; /* Indigo */
+            --button-bg: #FFB6C1; /* Light Pink */
+            --button-hover-bg: #FF69B4; /* Hot Pink */
+            --container-bg: #FFFFFF;
+            --shadow: rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: 'Fredoka', sans-serif;
+            background-color: var(--bg-focus);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            transition: background-color 0.5s ease;
+        }
+
+        .container {
+            background-color: var(--container-bg);
+            padding: 30px 40px;
+            border-radius: 25px;
+            box-shadow: 0 10px 25px var(--shadow);
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        #session-title {
+            font-size: 1.5rem;
+            font-weight: 500;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            height: 30px; /* Jaga agar layout stabil */
+        }
+        
+        .timer {
+            font-size: 6rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin: 20px 0;
+        }
+
+        .buttons button {
+            background-color: var(--button-bg);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            margin: 5px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-family: 'Fredoka', sans-serif;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+        }
+
+        .buttons button:hover {
+            background-color: var(--button-hover-bg);
+        }
+
+        .buttons button:active {
+            transform: scale(0.97);
+        }
+
+        .settings {
+            margin-top: 30px;
+            border-top: 2px dashed var(--bg-focus);
+            padding-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        h3 {
+            color: var(--primary-color);
+            margin: 0 0 10px 0;
+        }
+
+        .input-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .input-group label {
+            color: var(--primary-color);
+            font-size: 1rem;
+        }
+
+        .input-group input {
+            width: 60px;
+            padding: 8px;
+            border: 2px solid var(--bg-focus);
+            border-radius: 8px;
+            text-align: center;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 1rem;
+        }
+        
+        .input-group input:focus {
+            outline: 2px solid var(--button-bg);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Pomodoro Time ✨</h1>
+    <h2 id="session-title">Waktunya Fokus!</h2>
+    <div class="timer">
+        <span id="minutes">25</span>:<span id="seconds">00</span>
+    </div>
+    <div class="buttons">
+        <button id="start-pause">Mulai</button>
+        <button id="reset">Reset</button>
+    </div>
+
+    <div class="settings">
+        <h3>Pengaturan Durasi (menit)</h3>
+        <div class="input-group">
+            <label for="focus-duration">Fokus:</label>
+            <input type="number" id="focus-duration" value="25" min="1">
+        </div>
+        <div class="input-group">
+            <label for="short-break-duration">Istirahat Pendek:</label>
+            <input type="number" id="short-break-duration" value="5" min="1">
+        </div>
+        <div class="input-group">
+            <label for="long-break-duration">Istirahat Panjang:</label>
+            <input type="number" id="long-break-duration" value="15" min="1">
+        </div>
+    </div>
+</div>
+
+<audio id="notification-sound" src="hai sudah dulu belaj.mp3" preload="auto"></audio>
+
+<script>
+    // Referensi Elemen DOM
+    const minutesEl = document.getElementById('minutes');
+    const secondsEl = document.getElementById('seconds');
+    const startPauseBtn = document.getElementById('start-pause');
+    const resetBtn = document.getElementById('reset');
+    const sessionTitleEl = document.getElementById('session-title');
+    const notificationSound = document.getElementById('notification-sound');
+
+    // Referensi Input Pengaturan
+    const focusInput = document.getElementById('focus-duration');
+    const shortBreakInput = document.getElementById('short-break-duration');
+    const longBreakInput = document.getElementById('long-break-duration');
+
+    // Variabel Timer
+    let timerInterval;
+    let totalSeconds = 25 * 60;
+    let isRunning = false;
+    let sessionType = 'focus'; // 'focus', 'shortBreak', 'longBreak'
+    let focusSessionsCompleted = 0;
+
+    // Fungsi untuk memperbarui tampilan timer
+    function updateTimerDisplay() {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        minutesEl.textContent = String(minutes).padStart(2, '0');
+        secondsEl.textContent = String(seconds).padStart(2, '0');
+    }
+
+    // Fungsi untuk beralih sesi secara otomatis
+    function switchSession() {
+        clearInterval(timerInterval);
+        isRunning = false;
+        notificationSound.play();
+
+        if (sessionType === 'focus') {
+            focusSessionsCompleted++;
+            if (focusSessionsCompleted % 4 === 0) {
+                sessionType = 'longBreak';
+                sessionTitleEl.textContent = 'Istirahat Panjang Yuk!';
+                document.body.style.backgroundColor = 'var(--bg-long-break)';
+                totalSeconds = longBreakInput.value * 60;
+            } else {
+                sessionType = 'shortBreak';
+                sessionTitleEl.textContent = 'Istirahat Dulu Sebentar~';
+                document.body.style.backgroundColor = 'var(--bg-short-break)';
+                totalSeconds = shortBreakInput.value * 60;
+            }
+        } else { // Jika dari istirahat (short atau long)
+            sessionType = 'focus';
+            sessionTitleEl.textContent = 'Waktunya Fokus!';
+            document.body.style.backgroundColor = 'var(--bg-focus)';
+            totalSeconds = focusInput.value * 60;
+        }
+
+        updateTimerDisplay();
+        startPauseBtn.textContent = 'Mulai'; // Siap untuk sesi baru
+        
+        // Otomatis memulai sesi berikutnya
+        setTimeout(startTimer, 1000); 
+    }
+    
+    // Fungsi untuk memulai timer
+    function startTimer() {
+        if (isRunning) return;
+        
+        isRunning = true;
+        startPauseBtn.textContent = 'Jeda';
+
+        timerInterval = setInterval(() => {
+            if (totalSeconds <= 0) {
+                switchSession();
+                return;
+            }
+            totalSeconds--;
+            updateTimerDisplay();
+        }, 1000);
+    }
+
+    // Fungsi untuk menjeda timer
+    function pauseTimer() {
+        if (!isRunning) return;
+        
+        isRunning = false;
+        startPauseBtn.textContent = 'Lanjut';
+        clearInterval(timerInterval);
+    }
+
+    // Fungsi untuk mereset timer
+    function resetTimer() {
+        clearInterval(timerInterval);
+        isRunning = false;
+        
+        // Reset ke durasi sesi yang sedang aktif
+        if (sessionType === 'focus') {
+            totalSeconds = focusInput.value * 60;
+        } else if (sessionType === 'shortBreak') {
+            totalSeconds = shortBreakInput.value * 60;
+        } else {
+            totalSeconds = longBreakInput.value * 60;
+        }
+        
+        updateTimerDisplay();
+        startPauseBtn.textContent = 'Mulai';
+    }
+
+    // Event Listener untuk tombol
+    startPauseBtn.addEventListener('click', () => {
+    // Unlock audio pada interaksi pertama user
+    notificationSound.play().then(() => {
+        notificationSound.pause();
+        notificationSound.currentTime = 0;
+    }).catch(() => {});
+    if (isRunning) {
+        pauseTimer();
+    } else {
+        startTimer();
+    }
+});
+
+    resetBtn.addEventListener('click', resetTimer);
+
+    // Event listener untuk input durasi
+    // Ketika nilai diubah, reset timer saat ini agar sesuai
+    [focusInput, shortBreakInput, longBreakInput].forEach(input => {
+        input.addEventListener('change', () => {
+             // Hanya reset jika timer sedang tidak berjalan agar tidak mengganggu sesi
+            if (!isRunning) {
+                resetTimer();
+            }
+        });
+    });
+
+    // Inisialisasi tampilan awal saat halaman dimuat
+    updateTimerDisplay();
+</script>
+
+</body>
+</html>
